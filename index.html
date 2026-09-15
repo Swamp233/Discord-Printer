@@ -21,7 +21,9 @@ body{
   background:var(--panel);border:1px solid var(--line);border-radius:20px;
   padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.045);margin-bottom:14px
 }
-.search{display:flex;gap:8px}
+.search{display:flex;gap:8px;align-items:stretch}
+.search button{flex:0 0 auto;white-space:nowrap}
+.primary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 input{
   min-width:0;flex:1;border:1px solid var(--line);background:white;color:var(--ink);
   border-radius:12px;padding:12px 13px;font-size:16px;outline:none
@@ -36,6 +38,10 @@ button.outline{background:white;color:var(--ink);border:1px solid var(--line)}
 button:disabled{opacity:.45}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .actions.three{grid-template-columns:1fr 1fr 1fr}
+.more-card summary{cursor:pointer;font-weight:800;font-size:14px;list-style:none}
+.more-card summary::-webkit-details-marker{display:none}
+.more-card[open] summary{margin-bottom:12px}
+.more-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .status{font-size:13px;color:var(--muted);min-height:20px;margin-top:9px;line-height:1.45}
 .status.good{color:var(--good)} .status.bad{color:var(--bad)}
 
@@ -48,7 +54,7 @@ button:disabled{opacity:.45}
   margin:0 auto
 }
 .art-preview img{
-  display:block;width:146px;max-width:44vw;height:auto;border-radius:10px;
+  display:block;width:min(100%,354px);max-width:100%;height:auto;border-radius:13px;
   box-shadow:0 4px 14px rgba(0,0,0,.11);background:#eee
 }
 .proxy-wrap{display:flex;justify-content:center}
@@ -128,23 +134,16 @@ button:disabled{opacity:.45}
     <div class="controls">
       <div class="card">
         <div class="search">
-          <input id="q" placeholder="输入卡名或 Token 名，例如 Dragon" autocapitalize="off" autocomplete="off">
-        </div>
-
-        <div class="actions">
-          <button id="searchBtn">查找卡牌</button>
+          <input id="tokenQ" placeholder="搜索 Token，例如 Dragon" autocapitalize="off" autocomplete="off" enterkeyhint="search">
           <button id="tokenSearchBtn" class="secondary">查找 Token</button>
+        </div>
+
+        <div class="primary-actions">
           <button id="randomBtn">🎲 随机非地牌</button>
-          <button id="randomTokenBtn" class="secondary">🎲 随机 Token</button>
-        </div>
-
-        <div class="actions three">
           <button id="printBtn" class="outline">🖨 打印</button>
-          <button id="pngBtn" class="outline">🖼 PNG</button>
-          <button id="copyBtn" class="outline">📋 复制</button>
         </div>
 
-        <div id="status" class="status">当前为示例卡。联网后直接调用 Scryfall。</div>
+        <div id="status" class="status">“Oh, what fun is there in making sense?”</div>
       </div>
 
       <div id="tokenResultsCard" class="card hidden">
@@ -181,6 +180,18 @@ button:disabled{opacity:.45}
   <div class="footer">
     卡牌数据来自 Scryfall API。最近查看只保存在当前设备浏览器的 localStorage。
   </div>
+
+  <details class="card more-card" id="morePanel">
+    <summary>••• 更多</summary>
+    <div class="search">
+      <input id="cardQ" placeholder="载入指定普通卡牌" autocapitalize="off" autocomplete="off" enterkeyhint="search">
+      <button id="searchBtn" class="secondary">载入</button>
+    </div>
+    <div class="more-tools">
+      <button id="pngBtn" class="outline">🖼 生成 PNG</button>
+      <button id="randomTokenBtn" class="outline">🎲 随机 Token</button>
+    </div>
+  </details>
 </div>
 
 <script>
@@ -308,7 +319,8 @@ function setStatus(t, kind=""){
 
 function loading(v){
   ["randomBtn","randomTokenBtn","searchBtn","tokenSearchBtn"].forEach(id=>{
-    $("#" + id).disabled = v;
+    const el = $("#" + id);
+    if(el) el.disabled = v;
   });
 }
 
@@ -360,17 +372,17 @@ async function randomToken(){
 }
 
 async function searchCard(){
-  const q = $("#q").value.trim();
+  const q = $("#cardQ").value.trim();
   if(!q) return;
   try{
     loading(true);
     hideTokenResults();
-    setStatus("正在查找卡牌…");
+    setStatus("正在载入卡牌…");
     const c = await fetchJson(`${api}/cards/named?fuzzy=${encodeURIComponent(q)}`);
     render(c);
-    setStatus("已找到：" + c.name,"good");
+    setStatus("已载入：" + c.name,"good");
   }catch(e){
-    setStatus("没有找到或请求失败：" + e.message,"bad");
+    setStatus("载入失败：" + e.message,"bad");
   }finally{
     loading(false);
   }
@@ -401,7 +413,7 @@ function tokenResultLabel(c){
 }
 
 async function searchToken(){
-  const raw = $("#q").value.trim();
+  const raw = $("#tokenQ").value.trim();
   if(!raw) return;
 
   try{
@@ -512,15 +524,6 @@ ${f.oracle_text || ""}${stat ? `\n${stat}` : ""}`;
   return `${body}
 
 ${rarityLabel(card)} · ${(card.set || "").toUpperCase()} ${card.collector_number || ""}`.trim();
-}
-
-async function copyText(){
-  try{
-    await navigator.clipboard.writeText(plainText());
-    setStatus("已复制代理卡文字。","good");
-  }catch(e){
-    setStatus("复制失败；可长按页面文字手动复制。","bad");
-  }
 }
 
 function wrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines=30){
@@ -703,7 +706,8 @@ function renderRecent(){
           render(c);
           setStatus("已载入：" + c.name,"good");
         }else{
-          $("#q").value = item.name;
+          $("#morePanel").open = true;
+          $("#cardQ").value = item.name;
           await searchCard();
         }
       }catch(e){
@@ -718,12 +722,14 @@ $("#randomBtn").onclick = randomCard;
 $("#randomTokenBtn").onclick = randomToken;
 $("#searchBtn").onclick = searchCard;
 $("#tokenSearchBtn").onclick = searchToken;
-$("#q").addEventListener("keydown",e=>{
+$("#tokenQ").addEventListener("keydown",e=>{
+  if(e.key === "Enter") searchToken();
+});
+$("#cardQ").addEventListener("keydown",e=>{
   if(e.key === "Enter") searchCard();
 });
 $("#printBtn").onclick = ()=>window.print();
 $("#pngBtn").onclick = proxyPng;
-$("#copyBtn").onclick = copyText;
 
 render(current);
 renderRecent();
