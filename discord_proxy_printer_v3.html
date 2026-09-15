@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea">
+<title>Discord Proxy Printer</title>
+<style>
+:root{
+  --bg:#f4f1ea;--panel:#fff;--ink:#171717;--muted:#6d6962;
+  --line:#d9d2c6;--soft:#ece7de;--accent:#1d1d1f;
+  --good:#2f6a45;--bad:#a33838
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif
+}
+.app{max-width:920px;margin:0 auto;padding:18px 14px 40px}
+.header{padding:10px 2px 16px}
+h1{font-size:25px;line-height:1.15;margin:0 0 7px;letter-spacing:-.02em}
+.sub{font-size:14px;line-height:1.55;color:var(--muted)}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:20px;
+  padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.045);margin-bottom:14px
+}
+.search{display:flex;gap:8px}
+input{
+  min-width:0;flex:1;border:1px solid var(--line);background:white;color:var(--ink);
+  border-radius:12px;padding:12px 13px;font-size:16px;outline:none
+}
+input:focus{border-color:#888;box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+button{
+  appearance:none;border:0;border-radius:12px;padding:12px 14px;
+  font-size:15px;font-weight:700;background:var(--accent);color:white;cursor:pointer
+}
+button.secondary{background:var(--soft);color:var(--ink)}
+button.outline{background:white;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.45}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.actions.three{grid-template-columns:1fr 1fr 1fr}
+.status{font-size:13px;color:var(--muted);min-height:20px;margin-top:9px;line-height:1.45}
+.status.good{color:var(--good)} .status.bad{color:var(--bad)}
+
+.art-preview{
+  display:none;margin-bottom:16px
+}
+.art-preview.visible{display:block}
+.art-preview-title{font-weight:800;font-size:14px;margin-bottom:9px}
+.art-preview-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;
+  max-width:560px;margin:0 auto
+}
+.art-preview img{
+  display:block;width:100%;height:auto;border-radius:14px;
+  box-shadow:0 6px 22px rgba(0,0,0,.12);background:#eee
+}
+.proxy-wrap{display:flex;justify-content:center}
+.proxy{
+  width:min(100%,354px);aspect-ratio:63/88;background:white;border:2px solid #111;
+  border-radius:13px;padding:14px 14px 48px;display:flex;flex-direction:column;
+  overflow:hidden;position:relative
+}
+.proxy-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+  border-bottom:2px solid #111;padding-bottom:7px
+}
+.name{font-size:21px;line-height:1.12;font-weight:850;letter-spacing:-.02em}
+.mana{font-size:14px;font-weight:800;white-space:nowrap}
+.type{font-size:13px;font-weight:750;border-bottom:1px solid #333;padding:7px 0}
+.oracle{
+  font-family:Georgia,"Times New Roman",serif;font-size:14px;line-height:1.35;
+  white-space:pre-wrap;padding-top:9px;flex:1;overflow:hidden
+}
+.face{min-height:0}
+.face+.face{border-top:2px dashed #777;margin-top:9px;padding-top:9px}
+.face.multi{position:relative;padding-bottom:28px}
+.pt-fixed,.pt-inline{
+  border:1.5px solid #111;border-radius:7px;padding:3px 7px;
+  font-size:15px;font-weight:850;background:#fff
+}
+.pt-fixed{position:absolute;right:14px;bottom:12px}
+.pt-inline{position:absolute;right:0;bottom:0}
+.meta-bottom{
+  position:absolute;left:14px;bottom:14px;right:92px;
+  color:#555;font-size:9.5px;line-height:1.2
+}
+.rarity{font-weight:850;letter-spacing:.03em}
+.note{font-size:12px;color:var(--muted);line-height:1.55;margin-top:10px}
+.section-title{font-weight:800;font-size:14px;margin-bottom:9px}
+.chips{display:flex;gap:7px;overflow:auto;padding-bottom:2px}
+.chips.wrap{flex-wrap:wrap;overflow:visible}
+.chips button{font-size:12px;padding:8px 10px;white-space:nowrap}
+.result-list{display:grid;gap:7px}
+.result-btn{
+  width:100%;text-align:left;background:var(--soft);color:var(--ink);padding:10px 11px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px
+}
+.result-main{min-width:0}
+.result-name{font-weight:800;font-size:13px}
+.result-sub{font-size:11px;color:var(--muted);margin-top:2px;white-space:normal}
+.result-stat{font-size:12px;font-weight:850;white-space:nowrap}
+.hidden{display:none!important}
+.footer{font-size:12px;line-height:1.55;color:var(--muted);padding:4px}
+
+@media(min-width:760px){
+  .app{padding:28px}
+  .layout{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+  .controls{position:sticky;top:18px}
+}
+@media(max-width:420px){
+  .actions.three{grid-template-columns:1fr 1fr}
+}
+@media print{
+  @page{size:80mm auto;margin:4mm}
+  body{background:#fff}
+  .header,.controls,.footer,.note,.art-preview{display:none!important}
+  .app,.layout,.card{
+    padding:0!important;margin:0!important;display:block!important;border:0!important;
+    box-shadow:none!important
+  }
+  .proxy-wrap{display:block}
+  .proxy{
+    width:63mm;height:88mm;aspect-ratio:auto;border:0;border-radius:0;
+    padding:4mm 4mm 10mm;page-break-inside:avoid
+  }
+  .pt-fixed{right:4mm;bottom:3mm}
+  .meta-bottom{left:4mm;bottom:3.5mm;right:22mm}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Discord Proxy Printer</h1>
+    <div class="sub">
+      iPhone 友好的 Scryfall → 文字代理卡工具。现在支持普通卡、Token、相关 Token、卡图预览、稀有度和固定右下角 P/T。
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="controls">
+      <div class="card">
+        <div class="search">
+          <input id="q" placeholder="输入卡名或 Token 名，例如 Dragon" autocapitalize="off" autocomplete="off">
+        </div>
+
+        <div class="actions">
+          <button id="searchBtn">查找卡牌</button>
+          <button id="tokenSearchBtn" class="secondary">查找 Token</button>
+          <button id="randomBtn">🎲 随机非地牌</button>
+          <button id="randomTokenBtn" class="secondary">🎲 随机 Token</button>
+        </div>
+
+        <div class="actions three">
+          <button id="printBtn" class="outline">🖨 打印</button>
+          <button id="pngBtn" class="outline">🖼 PNG</button>
+          <button id="copyBtn" class="outline">📋 复制</button>
+        </div>
+
+        <div id="status" class="status">当前为示例卡。联网后直接调用 Scryfall。</div>
+      </div>
+
+      <div id="tokenResultsCard" class="card hidden">
+        <div class="section-title">Token 搜索结果</div>
+        <div id="tokenResults" class="result-list"></div>
+        <div class="note">相同名字的 Token 可能有不同 P/T 或异能；这里按实际规则文本去重，而不是按卡图去重。</div>
+      </div>
+
+      <div id="relatedTokensCard" class="card hidden">
+        <div class="section-title">这张牌的相关 Token</div>
+        <div id="relatedTokens" class="chips wrap"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">最近查看</div>
+        <div class="chips" id="recent"></div>
+        <div class="note">
+          iPhone 上建议把网页添加到主屏幕。以后接热敏打印机时，“生成 PNG → iOS 分享 → 打印 App”通常最稳。
+        </div>
+      </div>
+    </div>
+
+    <div class="card proxy-card">
+      <div id="artPreview" class="art-preview">
+        <div class="art-preview-title">卡图预览</div>
+        <div id="artPreviewGrid" class="art-preview-grid"></div>
+      </div>
+      <div class="proxy-wrap">
+        <div class="proxy" id="proxy"></div>
+      </div>
+      <div class="note">
+        P/T 对单面生物和 Token 始终固定在卡片右下角；稀有度、系列与编号放左下角。双面牌会分别显示两面的数值。
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    卡牌数据来自 Scryfall API。最近查看只保存在当前设备浏览器的 localStorage。
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const api = "https://api.scryfall.com";
+
+let current = {
+  name:"Discord, Lord of Disharmony",
+  mana_cost:"{2}{B}{R}",
+  type_line:"Legendary Creature — Chimera",
+  oracle_text:"At the beginning of your end step, exile cards from the top of your library until you exile a nonland card. You may cast that card without paying its mana cost. If you do, copy this ability.",
+  power:"4",
+  toughness:"4",
+  rarity:"rare",
+  set_name:"Secret Lair Drop",
+  set:"sld",
+  collector_number:"798"
+};
+
+const rarityMap = {
+  common:"C · COMMON",
+  uncommon:"U · UNCOMMON",
+  rare:"R · RARE",
+  mythic:"M · MYTHIC",
+  special:"S · SPECIAL",
+  bonus:"B · BONUS"
+};
+
+function esc(s=""){
+  return String(s).replace(/[&<>"']/g,m=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  }[m]));
+}
+
+function rarityLabel(card){
+  const r = String(card.rarity || "").toLowerCase();
+  return rarityMap[r] || (r ? r.toUpperCase() : "RARITY N/A");
+}
+
+function statText(f){
+  if(f.power !== undefined && f.toughness !== undefined) return `${f.power}/${f.toughness}`;
+  if(f.loyalty) return `Loyalty ${f.loyalty}`;
+  if(f.defense) return `Defense ${f.defense}`;
+  return "";
+}
+
+function cardImageEntries(card){
+  if(card?.image_uris?.normal){
+    return [{name:card.name || "Card", url:card.image_uris.normal}];
+  }
+
+  if(card?.card_faces?.length){
+    return card.card_faces
+      .filter(f => f?.image_uris?.normal)
+      .map(f => ({name:f.name || card.name || "Card face", url:f.image_uris.normal}));
+  }
+
+  return [];
+}
+
+function renderCardArt(card){
+  const box = $("#artPreview");
+  const grid = $("#artPreviewGrid");
+  const images = cardImageEntries(card);
+
+  grid.innerHTML = "";
+  if(!images.length){
+    box.classList.remove("visible");
+    return;
+  }
+
+  for(const item of images){
+    const img = document.createElement("img");
+    img.src = item.url;
+    img.alt = `${item.name} 卡图`;
+    img.loading = "lazy";
+    img.decoding = "async";
+    grid.appendChild(img);
+  }
+
+  box.classList.add("visible");
+}
+
+function faceHtml(f, multi=false){
+  const stat = statText(f);
+  return `
+    <div class="face ${multi ? "multi" : ""}">
+      <div class="proxy-head">
+        <div class="name">${esc(f.name || current.name)}</div>
+        <div class="mana">${esc(f.mana_cost || "")}</div>
+      </div>
+      <div class="type">${esc(f.type_line || "")}</div>
+      <div class="oracle">${esc(f.oracle_text || "").replace(/\n/g,"<br>")}</div>
+      ${multi && stat ? `<div class="pt-inline">${esc(stat)}</div>` : ""}
+    </div>`;
+}
+
+function render(card){
+  current = card;
+  const faces = card.card_faces?.length ? card.card_faces : [card];
+  const multi = faces.length > 1;
+  const singleStat = !multi ? statText(faces[0]) : "";
+
+  $("#proxy").innerHTML =
+    faces.map(f => faceHtml(f, multi)).join("") +
+    `<div class="meta-bottom">
+      <span class="rarity">${esc(rarityLabel(card))}</span><br>
+      ${esc(card.set_name || "")}${card.set ? ` · ${esc(card.set.toUpperCase())}` : ""}${card.collector_number ? ` ${esc(card.collector_number)}` : ""}
+    </div>` +
+    (singleStat ? `<div class="pt-fixed">${esc(singleStat)}</div>` : "");
+
+  renderCardArt(card);
+  remember(card);
+  renderRelatedTokens(card);
+}
+
+function setStatus(t, kind=""){
+  const el = $("#status");
+  el.textContent = t;
+  el.className = "status " + kind;
+}
+
+function loading(v){
+  ["randomBtn","randomTokenBtn","searchBtn","tokenSearchBtn"].forEach(id=>{
+    $("#" + id).disabled = v;
+  });
+}
+
+async function fetchJson(url){
+  const r = await fetch(url, {
+    headers: {"Accept":"application/json;q=0.9,*/*;q=0.8"}
+  });
+  if(!r.ok){
+    let detail = "";
+    try{
+      const j = await r.json();
+      detail = j.details ? ` · ${j.details}` : "";
+    }catch(_){}
+    throw new Error(`Scryfall ${r.status}${detail}`);
+  }
+  return r.json();
+}
+
+async function randomCard(){
+  try{
+    loading(true);
+    hideTokenResults();
+    setStatus("正在随机非地牌…");
+    const q = "-t:land -t:token";
+    const c = await fetchJson(`${api}/cards/random?q=${encodeURIComponent(q)}`);
+    render(c);
+    setStatus("已随机。若是瞬间/法术，可以只在手机上结算，不必打印。","good");
+  }catch(e){
+    setStatus("请求失败：" + e.message,"bad");
+  }finally{
+    loading(false);
+  }
+}
+
+async function randomToken(){
+  try{
+    loading(true);
+    hideTokenResults();
+    setStatus("正在随机 Token…");
+    const q = "include:extras t:token";
+    const c = await fetchJson(`${api}/cards/random?q=${encodeURIComponent(q)}`);
+    render(c);
+    setStatus("已随机 Token。","good");
+  }catch(e){
+    setStatus("Token 随机失败：" + e.message,"bad");
+  }finally{
+    loading(false);
+  }
+}
+
+async function searchCard(){
+  const q = $("#q").value.trim();
+  if(!q) return;
+  try{
+    loading(true);
+    hideTokenResults();
+    setStatus("正在查找卡牌…");
+    const c = await fetchJson(`${api}/cards/named?fuzzy=${encodeURIComponent(q)}`);
+    render(c);
+    setStatus("已找到：" + c.name,"good");
+  }catch(e){
+    setStatus("没有找到或请求失败：" + e.message,"bad");
+  }finally{
+    loading(false);
+  }
+}
+
+function tokenSignature(c){
+  const faces = c.card_faces?.length ? c.card_faces : [c];
+  return faces.map(f=>[
+    f.name || c.name,
+    f.type_line || "",
+    f.oracle_text || "",
+    f.power ?? "",
+    f.toughness ?? "",
+    f.loyalty ?? "",
+    f.defense ?? ""
+  ].join("|")).join("||");
+}
+
+function tokenResultLabel(c){
+  const f = c.card_faces?.[0] || c;
+  const stat = statText(f);
+  const oracle = (f.oracle_text || "").replace(/\n/g," · ");
+  return {
+    name: c.name,
+    sub: [f.type_line || "", oracle].filter(Boolean).join(" — "),
+    stat
+  };
+}
+
+async function searchToken(){
+  const raw = $("#q").value.trim();
+  if(!raw) return;
+
+  try{
+    loading(true);
+    setStatus("正在查找 Token…");
+
+    const safe = raw.replace(/"/g,'\\"');
+    const query = `include:extras t:token name:"${safe}"`;
+    const data = await fetchJson(`${api}/cards/search?q=${encodeURIComponent(query)}&unique=prints&order=name`);
+
+    const seen = new Set();
+    const unique = [];
+    for(const c of data.data || []){
+      const sig = tokenSignature(c);
+      if(!seen.has(sig)){
+        seen.add(sig);
+        unique.push(c);
+      }
+      if(unique.length >= 12) break;
+    }
+
+    if(!unique.length) throw new Error("没有匹配的 Token");
+
+    if(unique.length === 1){
+      hideTokenResults();
+      render(unique[0]);
+      setStatus("已找到 Token：" + unique[0].name,"good");
+    }else{
+      renderTokenResults(unique);
+      setStatus(`找到 ${unique.length} 种不同规则版本，请选择。`,"good");
+    }
+  }catch(e){
+    hideTokenResults();
+    setStatus("Token 搜索失败：" + e.message,"bad");
+  }finally{
+    loading(false);
+  }
+}
+
+function renderTokenResults(cards){
+  const root = $("#tokenResults");
+  root.innerHTML = "";
+  cards.forEach(c=>{
+    const info = tokenResultLabel(c);
+    const b = document.createElement("button");
+    b.className = "result-btn";
+    b.innerHTML = `
+      <span class="result-main">
+        <span class="result-name">${esc(info.name)}</span>
+        <span class="result-sub">${esc(info.sub || "Token")}</span>
+      </span>
+      <span class="result-stat">${esc(info.stat)}</span>`;
+    b.onclick = ()=>{
+      render(c);
+      hideTokenResults();
+      setStatus("已选择 Token：" + c.name,"good");
+    };
+    root.appendChild(b);
+  });
+  $("#tokenResultsCard").classList.remove("hidden");
+}
+
+function hideTokenResults(){
+  $("#tokenResultsCard").classList.add("hidden");
+  $("#tokenResults").innerHTML = "";
+}
+
+async function renderRelatedTokens(card){
+  const parts = (card.all_parts || []).filter(p => p.component === "token" && p.uri);
+  const wrap = $("#relatedTokens");
+  wrap.innerHTML = "";
+
+  if(!parts.length){
+    $("#relatedTokensCard").classList.add("hidden");
+    return;
+  }
+
+  $("#relatedTokensCard").classList.remove("hidden");
+
+  for(const p of parts){
+    const b = document.createElement("button");
+    b.className = "secondary";
+    b.textContent = p.name || "Token";
+    b.onclick = async ()=>{
+      try{
+        setStatus("正在载入相关 Token…");
+        const token = await fetchJson(p.uri);
+        render(token);
+        setStatus("已载入相关 Token：" + token.name,"good");
+      }catch(e){
+        setStatus("相关 Token 载入失败：" + e.message,"bad");
+      }
+    };
+    wrap.appendChild(b);
+  }
+}
+
+function plainText(card=current){
+  const faces = card.card_faces?.length ? card.card_faces : [card];
+  const body = faces.map(f=>{
+    const stat = statText(f);
+    return `${f.name || card.name} ${f.mana_cost || ""}
+${f.type_line || ""}
+
+${f.oracle_text || ""}${stat ? `\n${stat}` : ""}`;
+  }).join("\n\n——— FLIP ———\n\n");
+
+  return `${body}
+
+${rarityLabel(card)} · ${(card.set || "").toUpperCase()} ${card.collector_number || ""}`.trim();
+}
+
+async function copyText(){
+  try{
+    await navigator.clipboard.writeText(plainText());
+    setStatus("已复制代理卡文字。","good");
+  }catch(e){
+    setStatus("复制失败；可长按页面文字手动复制。","bad");
+  }
+}
+
+function wrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines=30){
+  let line = "", lines = [];
+  for(const p of String(text || "").split("\n")){
+    if(p === ""){
+      lines.push("");
+      continue;
+    }
+    for(const ch of [...p]){
+      const test = line + ch;
+      if(ctx.measureText(test).width > maxWidth && line){
+        lines.push(line);
+        line = ch;
+      }else{
+        line = test;
+      }
+    }
+    if(line){
+      lines.push(line);
+      line = "";
+    }
+  }
+
+  lines = lines.slice(0,maxLines);
+  for(const l of lines){
+    ctx.fillText(l,x,y);
+    y += lineHeight;
+  }
+  return y;
+}
+
+function proxyPng(){
+  const scale = 4;
+  const W = 630, H = 880;
+  const c = document.createElement("canvas");
+  c.width = W * scale;
+  c.height = H * scale;
+  const ctx = c.getContext("2d");
+  ctx.scale(scale,scale);
+
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle = "#111";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(8,8,W-16,H-16);
+
+  const pad = 34;
+  const width = W - pad*2;
+  const faces = current.card_faces?.length ? current.card_faces : [current];
+  const multi = faces.length > 1;
+
+  if(!multi){
+    const f = faces[0];
+    let y = 45;
+
+    ctx.fillStyle = "#111";
+    ctx.font = "bold 30px Arial";
+    y = wrapText(ctx, f.name || current.name, pad, y, width-150, 34, 2) + 4;
+
+    ctx.font = "bold 20px Arial";
+    ctx.textAlign = "right";
+    ctx.fillText(f.mana_cost || "", W-pad, 45);
+    ctx.textAlign = "left";
+
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pad,y);
+    ctx.lineTo(W-pad,y);
+    ctx.stroke();
+    y += 28;
+
+    ctx.font = "bold 19px Arial";
+    y = wrapText(ctx, f.type_line || "", pad, y, width, 24, 3) + 12;
+
+    const oracle = f.oracle_text || "";
+    const oracleSize = oracle.length > 500 ? 17 : oracle.length > 320 ? 19 : 22;
+    const oracleLine = oracleSize + 7;
+    ctx.font = `${oracleSize}px Georgia`;
+    wrapText(ctx, oracle, pad, y, width, oracleLine, 23);
+
+    ctx.font = "bold 16px Arial";
+    ctx.fillText(rarityLabel(current), pad, H-48);
+    ctx.font = "14px Arial";
+    ctx.fillText(`${current.set_name || ""} ${(current.set || "").toUpperCase()} ${current.collector_number || ""}`.trim(), pad, H-27);
+
+    const stat = statText(f);
+    if(stat){
+      ctx.font = "bold 26px Arial";
+      ctx.textAlign = "right";
+      ctx.fillText(stat, W-pad, H-32);
+      ctx.textAlign = "left";
+    }
+  }else{
+    const halfH = (H - 70) / faces.length;
+
+    faces.forEach((f,i)=>{
+      const top = 28 + i*halfH;
+      const bottom = 28 + (i+1)*halfH - 8;
+      let y = top + 22;
+
+      if(i){
+        ctx.setLineDash([12,8]);
+        ctx.beginPath();
+        ctx.moveTo(pad,top-10);
+        ctx.lineTo(W-pad,top-10);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.fillStyle = "#111";
+      ctx.font = "bold 24px Arial";
+      y = wrapText(ctx, f.name || current.name, pad, y, width-130, 28, 2) + 2;
+
+      ctx.font = "bold 17px Arial";
+      ctx.textAlign = "right";
+      ctx.fillText(f.mana_cost || "", W-pad, top+22);
+      ctx.textAlign = "left";
+
+      ctx.font = "bold 16px Arial";
+      y = wrapText(ctx, f.type_line || "", pad, y+10, width, 20, 2) + 7;
+
+      const oracle = f.oracle_text || "";
+      const size = oracle.length > 260 ? 14 : 16;
+      ctx.font = `${size}px Georgia`;
+      wrapText(ctx, oracle, pad, y, width, size+5, 12);
+
+      const stat = statText(f);
+      if(stat){
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "right";
+        ctx.fillText(stat, W-pad, bottom);
+        ctx.textAlign = "left";
+      }
+    });
+
+    ctx.font = "bold 15px Arial";
+    ctx.fillText(rarityLabel(current), pad, H-27);
+  }
+
+  c.toBlob(blob=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (current.name || "proxy").replace(/[^\w\-]+/g,"_") + ".png";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    setStatus("已生成 PNG。iPhone 上可以从下载项打开，再分享到打印 App。","good");
+  },"image/png");
+}
+
+function remember(card){
+  if(!card?.name) return;
+  let arr = JSON.parse(localStorage.getItem("discordProxyRecentV2") || "[]");
+  const item = {name:card.name, uri:card.uri || "", token:(card.layout === "token" || (card.type_line || "").includes("Token"))};
+  arr = [item, ...arr.filter(x => x.uri ? x.uri !== item.uri : x.name !== item.name)].slice(0,8);
+  localStorage.setItem("discordProxyRecentV2", JSON.stringify(arr));
+  renderRecent();
+}
+
+function renderRecent(){
+  const arr = JSON.parse(localStorage.getItem("discordProxyRecentV2") || "[]");
+  const root = $("#recent");
+
+  if(!arr.length){
+    root.innerHTML = "<span style='font-size:12px;color:#888'>暂无</span>";
+    return;
+  }
+
+  root.innerHTML = "";
+  arr.forEach(item=>{
+    const b = document.createElement("button");
+    b.className = "secondary";
+    b.textContent = (item.token ? "Token · " : "") + item.name;
+    b.onclick = async ()=>{
+      try{
+        setStatus("正在载入最近查看…");
+        if(item.uri){
+          const c = await fetchJson(item.uri);
+          render(c);
+          setStatus("已载入：" + c.name,"good");
+        }else{
+          $("#q").value = item.name;
+          await searchCard();
+        }
+      }catch(e){
+        setStatus("载入失败：" + e.message,"bad");
+      }
+    };
+    root.appendChild(b);
+  });
+}
+
+$("#randomBtn").onclick = randomCard;
+$("#randomTokenBtn").onclick = randomToken;
+$("#searchBtn").onclick = searchCard;
+$("#tokenSearchBtn").onclick = searchToken;
+$("#q").addEventListener("keydown",e=>{
+  if(e.key === "Enter") searchCard();
+});
+$("#printBtn").onclick = ()=>window.print();
+$("#pngBtn").onclick = proxyPng;
+$("#copyBtn").onclick = copyText;
+
+render(current);
+renderRecent();
+</script>
+</body>
+</html>
