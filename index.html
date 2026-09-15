@@ -16,10 +16,7 @@ body{
   margin:0;background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",Arial,sans-serif
 }
-.app{max-width:920px;margin:0 auto;padding:18px 14px 40px}
-.header{padding:10px 2px 16px}
-h1{font-size:25px;line-height:1.15;margin:0 0 7px;letter-spacing:-.02em}
-.sub{font-size:14px;line-height:1.55;color:var(--muted)}
+.app{max-width:920px;margin:0 auto;padding:10px 12px 32px}
 .card{
   background:var(--panel);border:1px solid var(--line);border-radius:20px;
   padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.045);margin-bottom:14px
@@ -43,17 +40,16 @@ button:disabled{opacity:.45}
 .status.good{color:var(--good)} .status.bad{color:var(--bad)}
 
 .art-preview{
-  display:none;margin-bottom:16px
+  display:none;margin:0 auto 14px
 }
 .art-preview.visible{display:block}
-.art-preview-title{font-weight:800;font-size:14px;margin-bottom:9px}
 .art-preview-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;
-  max-width:560px;margin:0 auto
+  display:flex;justify-content:center;align-items:flex-start;gap:8px;flex-wrap:wrap;
+  margin:0 auto
 }
 .art-preview img{
-  display:block;width:100%;height:auto;border-radius:14px;
-  box-shadow:0 6px 22px rgba(0,0,0,.12);background:#eee
+  display:block;width:146px;max-width:44vw;height:auto;border-radius:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,.11);background:#eee
 }
 .proxy-wrap{display:flex;justify-content:center}
 .proxy{
@@ -108,9 +104,6 @@ button:disabled{opacity:.45}
   .layout{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
   .controls{position:sticky;top:18px}
 }
-@media(max-width:420px){
-  .actions.three{grid-template-columns:1fr 1fr}
-}
 @media print{
   @page{size:80mm auto;margin:4mm}
   body{background:#fff}
@@ -131,13 +124,6 @@ button:disabled{opacity:.45}
 </head>
 <body>
 <div class="app">
-  <div class="header">
-    <h1>Discord Proxy Printer</h1>
-    <div class="sub">
-      iPhone 友好的 Scryfall → 文字代理卡工具。现在支持普通卡、Token、相关 Token、卡图预览、稀有度和固定右下角 P/T。
-    </div>
-  </div>
-
   <div class="layout">
     <div class="controls">
       <div class="card">
@@ -172,18 +158,10 @@ button:disabled{opacity:.45}
         <div id="relatedTokens" class="chips wrap"></div>
       </div>
 
-      <div class="card">
-        <div class="section-title">最近查看</div>
-        <div class="chips" id="recent"></div>
-        <div class="note">
-          iPhone 上建议把网页添加到主屏幕。以后接热敏打印机时，“生成 PNG → iOS 分享 → 打印 App”通常最稳。
-        </div>
-      </div>
     </div>
 
     <div class="card proxy-card">
       <div id="artPreview" class="art-preview">
-        <div class="art-preview-title">卡图预览</div>
         <div id="artPreviewGrid" class="art-preview-grid"></div>
       </div>
       <div class="proxy-wrap">
@@ -193,6 +171,11 @@ button:disabled{opacity:.45}
         P/T 对单面生物和 Token 始终固定在卡片右下角；稀有度、系列与编号放左下角。双面牌会分别显示两面的数值。
       </div>
     </div>
+  </div>
+
+  <div class="card recent-card">
+    <div class="section-title">最近查看</div>
+    <div class="chips" id="recent"></div>
   </div>
 
   <div class="footer">
@@ -245,14 +228,16 @@ function statText(f){
 }
 
 function cardImageEntries(card){
-  if(card?.image_uris?.normal){
-    return [{name:card.name || "Card", url:card.image_uris.normal}];
+  const imageUrl = x => x?.image_uris?.small || x?.image_uris?.normal || "";
+
+  if(imageUrl(card)){
+    return [{name:card.name || "Card", url:imageUrl(card)}];
   }
 
   if(card?.card_faces?.length){
     return card.card_faces
-      .filter(f => f?.image_uris?.normal)
-      .map(f => ({name:f.name || card.name || "Card face", url:f.image_uris.normal}));
+      .filter(f => imageUrl(f))
+      .map(f => ({name:f.name || card.name || "Card face", url:imageUrl(f)}));
   }
 
   return [];
@@ -273,7 +258,8 @@ function renderCardArt(card){
     const img = document.createElement("img");
     img.src = item.url;
     img.alt = `${item.name} 卡图`;
-    img.loading = "lazy";
+    img.loading = "eager";
+    img.fetchPriority = "high";
     img.decoding = "async";
     grid.appendChild(img);
   }
