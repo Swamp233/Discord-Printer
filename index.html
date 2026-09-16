@@ -9,7 +9,7 @@
 :root{
   --bg:#f4f1ea;--panel:#fff;--ink:#171717;--muted:#6d6962;
   --line:#d9d2c6;--soft:#ece7de;--accent:#1d1d1f;
-  --good:#2f6a45;--bad:#a33838
+  --good:#2f6a45;--bad:#a33838;--display-card-width:336px
 }
 *{box-sizing:border-box}
 body{
@@ -54,12 +54,12 @@ button:disabled{opacity:.45}
   margin:0 auto
 }
 .art-preview img{
-  display:block;width:min(100%,354px);max-width:100%;height:auto;border-radius:13px;
+  display:block;width:min(100%,var(--display-card-width));max-width:100%;height:auto;border-radius:13px;
   box-shadow:0 4px 14px rgba(0,0,0,.11);background:#eee
 }
 .proxy-wrap{display:flex;justify-content:center}
 .proxy{
-  width:min(100%,354px);aspect-ratio:63/88;background:white;border:2px solid #111;
+  width:min(100%,var(--display-card-width));aspect-ratio:63/88;background:white;border:2px solid #111;
   border-radius:13px;padding:14px 14px 48px;display:flex;flex-direction:column;
   overflow:hidden;position:relative
 }
@@ -239,7 +239,7 @@ function statText(f){
 }
 
 function cardImageEntries(card){
-  const imageUrl = x => x?.image_uris?.small || x?.image_uris?.normal || "";
+  const imageUrl = x => x?.image_uris?.large || x?.image_uris?.normal || x?.image_uris?.png || x?.image_uris?.small || "";
 
   if(imageUrl(card)){
     return [{name:card.name || "Card", url:imageUrl(card)}];
@@ -556,7 +556,11 @@ function wrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines=30){
   return y;
 }
 
-function proxyPng(){
+function pngFileName(){
+  return (current.name || "proxy").replace(/[^\w\-]+/g,"_") + ".png";
+}
+
+async function buildProxyBlob(){
   const scale = 4;
   const W = 630, H = 880;
   const c = document.createElement("canvas");
@@ -664,15 +668,62 @@ function proxyPng(){
     ctx.fillText(rarityLabel(current), pad, H-27);
   }
 
-  c.toBlob(blob=>{
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = (current.name || "proxy").replace(/[^\w\-]+/g,"_") + ".png";
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  return await new Promise((resolve, reject)=>{
+    c.toBlob(blob=>{
+      if(blob) resolve(blob);
+      else reject(new Error("无法生成 PNG"));
+    },"image/png");
+  });
+}
+
+function downloadBlob(blob, fileName){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+async function proxyPng(){
+  try{
+    const blob = await buildProxyBlob();
+    downloadBlob(blob, pngFileName());
     setStatus("已生成 PNG。iPhone 上可以从下载项打开，再分享到打印 App。","good");
-  },"image/png");
+  }catch(e){
+    setStatus("PNG 生成失败：" + e.message,"bad");
+  }
+}
+
+async function sharePrintImage(){
+  try{
+    setStatus("正在生成打印图…");
+    const blob = await buildProxyBlob();
+    const fileName = pngFileName();
+
+    if(navigator.share && typeof File !== "undefined"){
+      const file = new File([blob], fileName, {type:"image/png"});
+      const canShareFile = !navigator.canShare || navigator.canShare({files:[file]});
+      if(canShareFile){
+        setStatus("请在分享面板中选择 Express Thermal Print。","good");
+        await navigator.share({
+          files:[file],
+          title: current.name || "Discord Proxy Printer",
+          text: `Print ${current.name || "proxy"}`
+        });
+        return;
+      }
+    }
+
+    window.print();
+    setStatus("当前浏览器不支持图片分享，已改用系统打印。","good");
+  }catch(e){
+    if(e?.name === "AbortError"){
+      setStatus("已取消分享。");
+      return;
+    }
+    setStatus("打印图生成失败：" + e.message,"bad");
+  }
 }
 
 function remember(card){
@@ -728,7 +779,7 @@ $("#tokenQ").addEventListener("keydown",e=>{
 $("#cardQ").addEventListener("keydown",e=>{
   if(e.key === "Enter") searchCard();
 });
-$("#printBtn").onclick = ()=>window.print();
+$("#printBtn").onclick = sharePrintImage;
 $("#pngBtn").onclick = proxyPng;
 
 render(current);
