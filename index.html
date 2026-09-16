@@ -189,12 +189,14 @@ button:disabled{opacity:.45}
     </div>
     <div class="more-tools">
       <button id="pngBtn" class="outline">🖼 生成 PNG</button>
+      <button id="openPrintImageBtn" class="outline">↗️ 打开打印图</button>
       <button id="randomTokenBtn" class="outline">🎲 随机 Token</button>
     </div>
   </details>
 </div>
 
 <script>
+// Discord Proxy Printer v9
 const $ = s => document.querySelector(s);
 const api = "https://api.scryfall.com";
 
@@ -685,6 +687,19 @@ function downloadBlob(blob, fileName){
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
+function openBlobImage(blob){
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, "_blank");
+  if(!w){
+    downloadBlob(blob, pngFileName());
+    setStatus("Safari 阻止了图片预览，已改为下载 PNG。","good");
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    return;
+  }
+  // Leave the blob URL alive long enough for iOS image preview/share actions.
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
 async function proxyPng(){
   try{
     const blob = await buildProxyBlob();
@@ -692,6 +707,17 @@ async function proxyPng(){
     setStatus("已生成 PNG。iPhone 上可以从下载项打开，再分享到打印 App。","good");
   }catch(e){
     setStatus("PNG 生成失败：" + e.message,"bad");
+  }
+}
+
+async function openPrintImage(){
+  try{
+    setStatus("正在生成打印图…");
+    const blob = await buildProxyBlob();
+    openBlobImage(blob);
+    setStatus("已打开打印图。若直接分享仍看不到 Express Thermal Print，可长按图片后选择“分享”。","good");
+  }catch(e){
+    setStatus("打印图生成失败：" + e.message,"bad");
   }
 }
 
@@ -706,11 +732,10 @@ async function sharePrintImage(){
       const canShareFile = !navigator.canShare || navigator.canShare({files:[file]});
       if(canShareFile){
         setStatus("请在分享面板中选择 Express Thermal Print。","good");
-        await navigator.share({
-          files:[file],
-          title: current.name || "Discord Proxy Printer",
-          text: `Print ${current.name || "proxy"}`
-        });
+        // iOS Safari may filter share targets differently when text/title are
+        // mixed with an image file. Share the PNG *alone* so the payload is as
+        // close as possible to sharing a PNG directly from Files/Photos.
+        await navigator.share({files:[file]});
         return;
       }
     }
@@ -781,6 +806,7 @@ $("#cardQ").addEventListener("keydown",e=>{
 });
 $("#printBtn").onclick = sharePrintImage;
 $("#pngBtn").onclick = proxyPng;
+$("#openPrintImageBtn").onclick = openPrintImage;
 
 render(current);
 renderRecent();
