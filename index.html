@@ -59,6 +59,7 @@ button{appearance:none;border:0;border-radius:12px;padding:12px 14px;font-size:1
 const $ = s => document.querySelector(s);
 const api = "https://api.scryfall.com";
 const PREVIEW_WIDTH = 384;
+const BOTTOM_SAFE_MARGIN = 24;
 const STORAGE_KEY = "discordProxyRecentV12";
 let lastPreviewBlob = null;
 let lastPreviewUrl = "";
@@ -304,8 +305,9 @@ function layoutPrint(card){
 function buildPrintCanvas(card){
   const plan=layoutPrint(card);
   const {kind,faces,width:W,height:H}=plan;
-  const c=document.createElement('canvas');c.width=W;c.height=H;
-  const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  const canvasH=H + BOTTOM_SAFE_MARGIN;
+  const c=document.createElement('canvas');c.width=W;c.height=canvasH;
+  const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,W,canvasH);
   if(kind==='battle'){
     // Rotate text, not the PNG dimensions: always output 384 px wide.
     ctx.save();ctx.translate(W,0);ctx.rotate(Math.PI/2);
